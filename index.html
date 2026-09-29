@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080a0f">
+<meta name="description" content="MaxSecure — локальные зашифрованные заметки с TOTP">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./css/style.css">
+<title>MaxSecure 2.0</title>
+</head>
+<body>
+<main class="app">
+<header class="topbar">
+  <div><div class="eyebrow">LOCAL CRYPTOGRAPHIC VAULT</div><h1>MaxSecure</h1></div>
+  <span id="status" class="status">локально</span>
+</header>
+
+<section id="setupPanel" class="card hidden">
+  <h2>Первичная настройка</h2>
+  <p class="muted">Сначала создайте постоянный секрет для этого экземпляра приложения и добавьте его в Google Authenticator.</p>
+  <button id="createSecretBtn" class="primary">Создать секрет</button>
+</section>
+
+<section id="secretPanel" class="card hidden">
+  <h2>Google Authenticator</h2>
+  <p class="muted">Секрет вашего экземпляра MaxSecure хранится локально как неэкспортируемый криптографический ключ.</p>
+  <label>Ключ настройки (Base32)</label>
+  <div class="secret-row">
+    <input id="secretDisplay" readonly>
+    <button id="copySecret" class="small">Копировать</button>
+  </div>
+  <div class="manual-box">
+    <b>Добавьте вручную в Google Authenticator</b>
+    <ol>
+      <li>Добавьте новый аккаунт.</li>
+      <li>Выберите ввод ключа настройки вручную.</li>
+      <li>Вставьте показанный Base32-ключ.</li>
+      <li>Тип ключа: <b>Time based</b>.</li>
+    </ol>
+  </div>
+  <label for="setupTotp">Проверочный 6-значный код</label>
+  <input id="setupTotp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+  <button id="confirmSecretBtn" class="primary">Подтвердить настройку</button>
+  <button id="deleteSecretBtn" class="danger">Сбросить локальную настройку</button>
+  <p class="warning">Сброс удалит локальный TOTP-ключ. Сохранённые заметки этого экземпляра после этого открыть будет нельзя.</p>
+</section>
+
+<section id="notesView" class="view hidden">
+  <div class="section-head">
+    <div><h2>Заметки</h2><p class="muted">Текст хранится только в зашифрованном виде.</p></div>
+    <button id="newNoteBtn" class="primary compact">＋ Новая</button>
+  </div>
+  <div id="notesList" class="notes-list"></div>
+  <div id="emptyNotes" class="empty card">
+    <div class="empty-icon">▱</div>
+    <h3>Заметок пока нет</h3>
+    <p class="muted">Создайте заметку. Заголовок будет виден в списке, а содержимое откроется только после проверки Authenticator.</p>
+  </div>
+</section>
+
+<section id="editorView" class="view hidden">
+  <div class="editor-head">
+    <button id="backToNotesBtn" class="back">‹ Заметки</button>
+    <span id="editorMode" class="muted">Новая заметка</span>
+  </div>
+  <div class="card">
+    <label for="noteTitle">Заголовок</label>
+    <input id="noteTitle" class="text-input" autocomplete="off" maxlength="120" placeholder="Например: Пароли от сервисов">
+    <label for="noteText">Текст</label>
+    <textarea id="noteText" spellcheck="false" autocomplete="off" placeholder="Введите текст заметки…"></textarea>
+    <label for="noteTotp">Актуальный код Google Authenticator</label>
+    <input id="noteTotp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <button id="saveNoteBtn" class="primary">Создать шифр-код и сохранить</button>
+    <button id="deleteNoteBtn" class="danger hidden">Удалить заметку</button>
+    <button id="revealCipherBtn" class="secondary hidden">Увидеть шифр-код и скопировать</button>
+    <textarea id="cipherReveal" class="cipher-reveal hidden" readonly spellcheck="false" aria-label="Шифр-код заметки"></textarea>
+    <p class="hint">При редактировании старый шифр-код заменяется новым только после успешной проверки кода и сохранения. Автосохранения нет.</p>
+  </div>
+</section>
+
+<section id="manualView" class="view hidden">
+  <div class="card">
+    <h2>Шифрование</h2>
+    <label for="plainText">Текст</label>
+    <textarea id="plainText" spellcheck="false" autocomplete="off" placeholder="Введите любой текст…"></textarea>
+    <label for="totpEncrypt">Текущий код Google Authenticator</label>
+    <input id="totpEncrypt" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <button id="encryptBtn" class="primary">Создать шифр-код</button>
+  </div>
+  <div id="encryptResult" class="card result hidden">
+    <div class="result-head"><label for="cipherOut">Самодостаточный шифр-код</label><button id="copyCipher" class="small">Копировать</button></div>
+    <textarea id="cipherOut" readonly spellcheck="false"></textarea>
+    <button id="downloadCipher" class="secondary">Сохранить .txt</button>
+  </div>
+</section>
+
+<section id="decryptView" class="view hidden">
+  <div class="card">
+    <h2>Расшифровка</h2>
+    <label for="cipherIn">Шифр-код</label>
+    <textarea id="cipherIn" spellcheck="false" autocomplete="off" placeholder="Вставьте полный шифр-код…"></textarea>
+    <label for="totpDecrypt">Текущий код Google Authenticator</label>
+    <input id="totpDecrypt" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <button id="decryptBtn" class="primary">Расшифровать</button>
+  </div>
+  <div id="decryptResult" class="card result hidden">
+    <div class="result-head"><label for="plainOut">Расшифрованный текст</label><button id="copyPlain" class="small">Копировать</button></div>
+    <textarea id="plainOut" readonly spellcheck="false"></textarea>
+  </div>
+</section>
+
+<section id="securityView" class="view hidden">
+  <div class="card security">
+    <h2>Модель защиты</h2>
+    <ul>
+      <li>Текст заметок шифруется существующей схемой AES-256-GCM.</li>
+      <li>Для каждого сохранения создаётся новая случайная 256-битная соль и nonce.</li>
+      <li>Постоянный TOTP-секрет хранится локально как неэкспортируемый HMAC CryptoKey.</li>
+      <li>Актуальный 6-значный TOTP-код проверяется перед открытием, сохранением и удалением заметки.</li>
+      <li>Сам TOTP-код в заметку не записывается.</li>
+      <li>Нет сервера, аналитики, CDN и сторонних библиотек.</li>
+      <li>Незавершённое редактирование не сохраняется автоматически.</li>
+    </ul>
+    <p class="warning">Браузер не предоставляет универсальной гарантии аппаратной привязки IndexedDB. Для особо критичных данных нужен независимый криптографический аудит.</p>
+  </div>
+  <div class="card">
+    <h2>Локальная настройка</h2>
+    <p class="muted">Сброс ключа сделает сохранённые шифр-коды этого экземпляра недоступными.</p>
+    <button id="resetFromSettingsBtn" class="danger">Сбросить TOTP-ключ</button>
+  </div>
+</section>
+
+<footer>Все операции выполняются на этом устройстве.</footer>
+</main>
+
+<nav id="bottomNav" class="bottom-nav hidden" aria-label="Навигация">
+  <button class="nav-btn active" data-view="notesView"><span>▱</span><b>Заметки</b></button>
+  <button class="nav-btn" data-view="manualView"><span>↕</span><b>Шифрование</b></button>
+  <button class="nav-btn" data-view="decryptView"><span>↕</span><b>Расшифровка</b></button>
+  <button class="nav-btn" data-view="securityView"><span>⚙</span><b>Настройки</b></button>
+</nav>
+
+<div id="authModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h2 id="authTitle">Подтвердите действие</h2>
+    <p id="authDescription" class="muted">Введите актуальный код Google Authenticator.</p>
+    <input id="authTotp" class="auth-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+    <button id="authConfirmBtn" class="primary">Подтвердить</button>
+    <button id="authCancelBtn" class="secondary">Отмена</button>
+  </div>
+</div>
+
+<div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card delete-modal">
+    <h2>ВЫ ТОЧНО ЖЕЛАЕТЕ БЕЗВОЗВРАТНО УДАЛИТЬ ЗАМЕТКУ?!</h2>
+    <p class="warning">После удаления заметка будет удалена из локального хранилища приложения.</p>
+    <button id="deleteConfirmBtn" class="danger" disabled>Удалить безвозвратно (10)</button>
+    <button id="deleteCancelBtn" class="secondary">Отмена</button>
+  </div>
+</div>
+
+<div id="resetModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card delete-modal">
+    <h2>ВЫ ТОЧНО ЖЕЛАЕТЕ СБРОСИТЬ TOTP-КЛЮЧ И УДАЛИТЬ ВСЕ ЗАМЕТКИ?!</h2>
+    <p class="warning">После подтверждения ключ и все сохранённые заметки будут безвозвратно удалены с устройства.</p>
+    <button id="resetConfirmBtn" class="danger" disabled>Сбросить всё безвозвратно (10)</button>
+    <button id="resetCancelBtn" class="secondary">Отмена</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" aria-live="polite"></div>
+<script src="./js/crypto.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"name":"MaxSecure 2.0","short_name":"MaxSecure","description":"Локальное PWA зашифрованных заметок с TOTP","start_url":"./","display":"standalone","background_color":"#080a0f","theme_color":"#080a0f","lang":"ru","icons":[{"src":"./favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
